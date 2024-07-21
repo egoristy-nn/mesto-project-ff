@@ -1,7 +1,7 @@
 import './pages/index.css';
-import {cardsConteiner, createCard, deleteCard, like} from './components/card.js';
+import {cardsConteiner, createCard} from './components/card.js';
 import {openPopup, closePopup} from './components/modals.js';
-import { enableValidation, clearValidation } from './components/validation.js';
+import { validationConfig, enableValidation, clearValidation } from './components/validation.js';
 import { loadUserInfo, loadCards, saveProfileData, addCard, removeCard, likeCard, unlikeCard, changeAvatar } from './components/api.js';
 
 const popupList = document.querySelectorAll('.popup');
@@ -47,13 +47,6 @@ function setValuesEditForm () {
   inputJob.value = profileDescription.textContent;
 }
 
-//функция сохранения данных профиля
-function saveValuesEditForm(evt) {
-  evt.preventDefault();
-  profileTitle.textContent = inputName.value;
-  profileDescription.textContent = inputJob.value;
-}
-
 //работаем со значением формы для добавления карточки
 const newPlaceForm = document.forms.new_place;
 const inputPlace = newPlaceForm.elements.place_name;
@@ -81,12 +74,16 @@ editButton.addEventListener('click', function() {
 });
 editNameForm.addEventListener('submit', function(evt){
   renderLoading(true, popupEdit);
-  saveValuesEditForm(evt);
-  saveProfileData(profileTitle.textContent, profileDescription.textContent)
+  evt.preventDefault();
+  saveProfileData(inputName.value, inputJob.value)
+  .then(res => {
+    profileTitle.textContent = inputName.value;
+    profileDescription.textContent = inputJob.value;
+    closePopup(popupEdit)
+  })
   .catch(err => console.log('Ошибка обновления данных пользователя'))
   .finally(res => {
     renderLoading(false, popupEdit)
-    closePopup(popupEdit)
   }) 
 });
 
@@ -101,17 +98,17 @@ newPlaceForm.addEventListener('submit', function(evt) {
   renderLoading(true, popupNewCard);
   addCard(inputPlace.value, inputURL.value)
   .then(data => {
-    const myId = '5c7f86bff2845991536227fe';
-    const newCard = createCard(data, deleteCard, like, showImage, myId);
+    const myId = data.owner._id;
+    const cardId = data._id;
+    const newCard = createCard(data, showImage, myId, cardId);
     cardsConteiner.prepend(newCard);
-    
+    closePopup(popupNewCard)
   })
   .catch(err => {
     console.log('Ошибка при добавлении карточки:', err)
   })
   .finally(res => {
-    renderLoading(false, popupNewCard);
-    closePopup(popupNewCard);
+    renderLoading(false, popupNewCard)
   })
 })
 
@@ -129,11 +126,11 @@ changeAvatarForm.addEventListener('submit', function(evt) {
   .then(data => {
     const profileAvatar = document.querySelector('.profile__image');
     profileAvatar.setAttribute('style', `background-image: url(${data})`)
+    closePopup(popupAvatar)
   })
   .catch(err => console.log('Ошибка при обновлении аватара: ', err))
   .finally(res => {
     renderLoading(false, popupAvatar);
-    closePopup(popupAvatar);
   })
 })
 
@@ -142,16 +139,8 @@ changeAvatarForm.addEventListener('submit', function(evt) {
 const profileForm = document.querySelector('.edit_profile_form');
 const placeForm = document.querySelector('.new_place_form');
 
-const validationConfig = {
-  formSelector: '.popup__form',
-  inputSelector: '.popup__input',
-  submitButtonSelector: '.popup__button',
-  inactiveButtonClass: '.popup__button_inactive',
-  inputErrorClass: '.popup__input_type_error',
-  errorClass: '.popup-input-error_active'
-}
-
 enableValidation(validationConfig);
+
 
 
 ////////////////////////////////////////////////////////////////////////
@@ -166,61 +155,16 @@ Promise.all([loadUserInfo(), loadCards()])
   const myId = userInfo._id;
   
   cardsArr.forEach(function (cardData) {
-    const card = createCard(cardData, deleteCard, like, showImage, myId, cardId);
+    const card = createCard(cardData, showImage, myId, cardId);
     cardsConteiner.append(card);
     const cardLikes = card.querySelector('.like_counter');
     cardLikes.textContent = cardData.likes.length;
     const cardId = cardData._id;
-
-    const likeButton = card.querySelector('.card__like-button');
-    const likers = cardData.likes;
-
-    //если лайк предварительно стоит, то сердечко черное
-    const hasId = likers.some(o => o._id === myId);
-    if(hasId) {
-      likeButton.classList.add('card__like-button_is-active');
-    }
-
-    //обработчик клика на корзину
-    card.addEventListener('click', function(evt){
-      if(evt.target.matches('.card__delete-button')) {
-        removeCard(cardId)
-        .then(res => console.log(`Удалена карточка с ID: ${cardId}`))
-        .catch(err => console.log('Ошибка удаления карточки'))
-      }
-    })
-
-    //обработчик клика на кнопку лайка
-    card.addEventListener('click', function(evt) {
-      if(evt.target.matches('.card__like-button')) {
-        cardLikeToggle(likeButton, cardId, cardLikes);
-      }
-    })
   })
 })
 .catch((err) => {
   console.log('Запрос не выполнен: ', err)
 })
-
-
-//обработка добавления/удаления лайка
-function cardLikeToggle(likeButton, cardId, cardLikes) {
-  if((likeButton.classList.contains('card__like-button_is-active'))) {
-    unlikeCard(cardId)
-    .then(data => {
-      likeButton.classList.remove('card__like-button_is-active');
-      cardLikes.textContent = data.likes.length;
-    })
-  }
-  else {
-    likeCard(cardId)
-    .then(data => {
-      likeButton.classList.add('card__like-button_is-active');
-      cardLikes.textContent = data.likes.length;
-    })
-    
-  }
-}
 
 //уведомление о загрузке
 function renderLoading(isLoading, popup) {
