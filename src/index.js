@@ -167,8 +167,6 @@ Promise.all([loadUserInfo(), loadCards()])
   cardsArr.forEach(function (cardData) { 
     const card = createCard(cardData, showImage, myId, cardId); 
     cardsConteiner.append(card); 
-    const cardLikes = card.querySelector('.like_counter');
-    cardLikes.textContent = cardData.likes.length; 
     const cardId = cardData._id;
   }) 
 }) 
